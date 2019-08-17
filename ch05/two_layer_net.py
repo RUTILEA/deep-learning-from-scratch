@@ -1,6 +1,7 @@
 # coding: utf-8
 import sys, os
 sys.path.append(os.pardir)  # 親ディレクトリのファイルをインポートするための設定
+import pickle
 import numpy as np
 from common.layers import *
 from common.gradient import numerical_gradient
@@ -75,3 +76,43 @@ class TwoLayerNet:
         grads['W2'], grads['b2'] = self.layers['Affine2'].dW, self.layers['Affine2'].db
 
         return grads
+
+    def save_params(self, file_name="params.pkl"):
+        params = {}
+        for key, val in self.params.items():
+            params[key] = val
+        with open(file_name, 'wb') as f:
+            pickle.dump(params, f)
+
+
+    def load_params(self, file_name="params.pkl"):
+        with open(file_name, 'rb') as f:
+            params = pickle.load(f)
+        for key, val in params.items():
+            self.params[key] = val
+
+        for i, layer_idx in enumerate((0, 2, 5, 7, 10, 12, 15, 18)):
+            self.layers[layer_idx].W = self.params['W' + str(i+1)]
+            self.layers[layer_idx].b = self.params['b' + str(i+1)]
+
+
+
+class FineTuningTwoLayerNet(TwoLayerNet):
+    def __init__(self, hidden_size, output_size, weight_init_std = 0.01, param_file='params,pkl'):
+        with open(param_file, 'rb') as f:
+            params = pickle.load(f)
+        # 重みの初期化
+        self.params = {}
+        # 1層目のみ学習済みパラメータを利用
+        self.params['W1'] = params['W1']
+        self.params['b1'] = params['b1']
+        self.params['W2'] = weight_init_std * np.random.randn(hidden_size, output_size) 
+        self.params['b2'] = np.zeros(output_size)
+
+        # レイヤの生成
+        self.layers = OrderedDict()
+        self.layers['Affine1'] = Affine(self.params['W1'], self.params['b1'])
+        self.layers['Relu1'] = Relu()
+        self.layers['Affine2'] = Affine(self.params['W2'], self.params['b2'])
+
+        self.lastLayer = SoftmaxWithLoss()
